@@ -16,7 +16,7 @@ const port = process.env.PORT || 5000;
 
 connectDB();
 
-const allowedOrigins = [
+const defaultAllowedOrigins = [
   "https://main.d1sj7cd70hlter.amplifyapp.com",
   "https://expense-tracker-app-three-beryl.vercel.app",
   "http://localhost:3000",
@@ -24,16 +24,38 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
 ];
+const allowedOrigins = (process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map((s) => s.trim().replace(/\/$/, "")).filter(Boolean)
+  : defaultAllowedOrigins);
 
 // Middleware
 app.use(express.json());
-app.use(
-  cors({
-    origin: allowedOrigins,
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE"],
-  })
-);
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    const normalizedOrigin = origin.replace(/\/$/, "");
+    const isAllowed = allowedOrigins.includes(normalizedOrigin);
+    if (process.env.NODE_ENV !== "production") {
+      console.log("CORS check:", { normalizedOrigin, allowedOrigins, isAllowed });
+    }
+    if (isAllowed) {
+      return callback(null, true);
+    }
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: [
+    "Origin",
+    "X-Requested-With",
+    "Content-Type",
+    "Accept",
+    "Authorization",
+  ],
+  optionsSuccessStatus: 204,
+};
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 app.use(helmet());
 app.use(helmet.crossOriginResourcePolicy({ policy: "cross-origin" }));
 app.use(morgan("dev"));
